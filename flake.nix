@@ -43,6 +43,7 @@
             packages = with pkgs; [
               (python312.withPackages (
                 pypkgs: with pypkgs; [
+                  isort
                   pip
                 ]
               ))
