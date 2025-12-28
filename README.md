@@ -73,18 +73,6 @@ mdns-filter eth0 wlan0 \
 mdns-filter eth0 wlan0 --filter-config /etc/mdns-filter/filters.yaml
 ```
 
-### Legacy IP Filtering
-
-Simple IP-based filtering (blacklist or whitelist, mutually exclusive):
-
-```bash
-# Blacklist a subnet
-mdns-filter -b 192.168.1.0/24 eth0 wlan0
-
-# Whitelist a subnet
-mdns-filter -w 192.168.5.0/24 eth0 wlan0
-```
-
 ## CLI Reference
 
 ```
@@ -97,8 +85,6 @@ Arguments:
 
 Options:
   -n, --dry-run             Log decisions without forwarding packets
-  -b, --blacklist CIDR      Legacy IP blacklist (can be specified multiple times)
-  -w, --whitelist CIDR      Legacy IP whitelist (can be specified multiple times)
   --filter-config PATH      Path to YAML filter configuration file
   --filter-allow PATTERN    Allow pattern (can be specified multiple times)
   --filter-deny PATTERN     Deny pattern (can be specified multiple times)

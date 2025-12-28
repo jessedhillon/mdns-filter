@@ -886,26 +886,6 @@ class FilterEngine:
 # =============================================================================
 
 
-class SubnetConfig(p.BaseModel):
-    """Represents a subnet configuration (for legacy IP-based filtering)."""
-
-    model_config = p.ConfigDict(frozen=True)
-
-    network: ipaddress.IPv4Network
-
-    @classmethod
-    def from_cidr(cls, cidr: str) -> "SubnetConfig":
-        """Parse a CIDR notation string like '192.168.1.0/24'."""
-        return cls(network=ipaddress.IPv4Network(cidr, strict=False))
-
-    def contains(self, addr: ipaddress.IPv4Address) -> bool:
-        """Check if an address belongs to this subnet."""
-        return addr in self.network
-
-    def __str__(self) -> str:
-        return str(self.network)
-
-
 class InterfaceInfo(p.BaseModel):
     """Network interface information (without socket, which can't be serialized)."""
 
@@ -961,17 +941,6 @@ class RepeaterConfig(p.BaseModel):
     ]
     dry_run: bool = False
     filter_config: FilterConfig = p.Field(default_factory=FilterConfig)
-
-    # Legacy IP-based filtering (still supported)
-    blacklist: list[SubnetConfig] = []
-    whitelist: list[SubnetConfig] = []
-
-    @p.model_validator(mode="after")
-    def validate_lists(self) -> "RepeaterConfig":
-        """Ensure blacklist and whitelist aren't both specified."""
-        if self.blacklist and self.whitelist:
-            raise ValueError("Cannot specify both blacklist and whitelist")
-        return self
 
 
 # =============================================================================
@@ -1097,16 +1066,6 @@ class MDNSRepeater:
         """Check if packet is from one of our own interface addresses."""
         return any(from_addr == iface.addr for iface in self.interface_sockets)
 
-    def _check_legacy_filters(self, from_addr: ipaddress.IPv4Address) -> bool:
-        """Check legacy IP-based whitelist/blacklist. Returns True if allowed."""
-        if self.config.whitelist:
-            return any(subnet.contains(from_addr) for subnet in self.config.whitelist)
-
-        if self.config.blacklist:
-            return not any(subnet.contains(from_addr) for subnet in self.config.blacklist)
-
-        return True
-
     def _evaluate_packet(
         self, from_addr: ipaddress.IPv4Address, data: bytes
     ) -> tuple[bool, ParsedMDNSPacket | None, str]:
@@ -1125,10 +1084,6 @@ class MDNSRepeater:
 
         if self._is_loopback(from_addr):
             return False, None, "loopback (our own packet)"
-
-        # Legacy IP filtering
-        if not self._check_legacy_filters(from_addr):
-            return False, None, "blocked by IP filter"
 
         # Parse the packet
         packet = MDNSParser.parse(data, from_addr)
@@ -1265,12 +1220,6 @@ class MDNSRepeater:
         if self.config.dry_run:
             logger.info("DRY RUN MODE - packets will not actually be forwarded")
 
-        # Log legacy filters
-        for subnet in self.config.whitelist:
-            logger.info("Whitelist: %s", subnet)
-        for subnet in self.config.blacklist:
-            logger.info("Blacklist: %s", subnet)
-
         # Log content filters
         if self.config.filter_config.rules:
             self._log_filter_config()
@@ -1346,9 +1295,6 @@ Examples:
 
   # Use a YAML config file for complex rules
   mdns-filter eth0 wlan0 --filter-config /etc/mdns-filter/filters.yaml
-
-  # Legacy IP-based filtering
-  mdns-filter -b 192.168.1.0/24 eth0 eth1
 """,
 )
 @click.argument("interfaces", nargs=-1, required=True)
@@ -1357,22 +1303,6 @@ Examples:
     "--dry-run",
     is_flag=True,
     help="Don't actually forward packets, just log what would happen.",
-)
-@click.option(
-    "-b",
-    "--blacklist",
-    "blacklist_cidrs",
-    multiple=True,
-    metavar="CIDR",
-    help="Blacklist subnet (legacy IP filter). Example: 192.168.1.0/24",
-)
-@click.option(
-    "-w",
-    "--whitelist",
-    "whitelist_cidrs",
-    multiple=True,
-    metavar="CIDR",
-    help="Whitelist subnet (legacy IP filter). Example: 192.168.1.0/24",
 )
 @click.option(
     "--filter-config",
@@ -1403,8 +1333,6 @@ Examples:
 def main(
     interfaces: tuple[str, ...],
     dry_run: bool,
-    blacklist_cidrs: tuple[str, ...],
-    whitelist_cidrs: tuple[str, ...],
     filter_config: Path | None,
     filter_allow_patterns: tuple[str, ...],
     filter_deny_patterns: tuple[str, ...],
@@ -1421,16 +1349,6 @@ def main(
     # Validate interface count
     if len(interfaces) < 2:
         raise click.UsageError("At least 2 interfaces must be specified.")
-
-    # Parse legacy subnet filters
-    try:
-        blacklist = [SubnetConfig.from_cidr(cidr) for cidr in blacklist_cidrs]
-        whitelist = [SubnetConfig.from_cidr(cidr) for cidr in whitelist_cidrs]
-    except ValueError as err:
-        raise click.UsageError(f"Invalid subnet: {err}") from err
-
-    if blacklist and whitelist:
-        raise click.UsageError("Cannot specify both --blacklist and --whitelist.")
 
     # Build filter configuration
     if filter_config is not None:
@@ -1468,8 +1386,6 @@ def main(
         config = RepeaterConfig(
             interfaces=list(interfaces),
             dry_run=dry_run,
-            blacklist=blacklist,
-            whitelist=whitelist,
             filter_config=fc,
         )
     except Exception as err:
