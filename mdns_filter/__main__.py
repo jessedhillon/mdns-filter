@@ -54,6 +54,7 @@ Examples:
     help="Don't actually forward packets, just log what would happen.",
 )
 @click.option(
+    "-c",
     "--filter-config",
     type=ClickPath,
     metavar="PATH",
