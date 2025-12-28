@@ -303,9 +303,7 @@ class TestFilterEngineEvaluate:
         assert action == FilterAction.Deny
         assert rule_name == "deny-test-service"
 
-    def test_deny_specific_allow_rest(
-        self, googlecast_packet: ParsedMDNSPacket, wiim_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_deny_specific_allow_rest(self, googlecast_packet: ParsedMDNSPacket, wiim_packet: ParsedMDNSPacket) -> None:
         """Common pattern: deny specific devices, allow everything else."""
         config = FilterConfig(
             default_action=FilterAction.Allow,
@@ -327,9 +325,7 @@ class TestFilterEngineEvaluate:
         action, _ = engine.evaluate(googlecast_packet)
         assert action == FilterAction.Allow
 
-    def test_allow_specific_deny_rest(
-        self, googlecast_packet: ParsedMDNSPacket, wiim_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_allow_specific_deny_rest(self, googlecast_packet: ParsedMDNSPacket, wiim_packet: ParsedMDNSPacket) -> None:
         """Common pattern: allow specific devices, deny everything else."""
         config = FilterConfig(
             default_action=FilterAction.Deny,

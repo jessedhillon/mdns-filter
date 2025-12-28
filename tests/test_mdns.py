@@ -172,10 +172,7 @@ class TestParsedMDNSPacket:
         assert "truncated" in summary
 
     def test_format_summary_many_answers(self) -> None:
-        answers = tuple(
-            DNSRecord(name=f"r{i}.local", record_type=RecordType.A, record_class=1)
-            for i in range(5)
-        )
+        answers = tuple(DNSRecord(name=f"r{i}.local", record_type=RecordType.A, record_class=1) for i in range(5))
         packet = ParsedMDNSPacket(
             transaction_id=0,
             flags=0x8400,

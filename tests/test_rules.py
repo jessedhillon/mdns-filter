@@ -98,21 +98,15 @@ class TestFilterMatchMatchesRecord:
             src_ip=ipaddress.IPv4Address("192.168.1.100"),
         )
 
-    def test_empty_match_matches_all(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_empty_match_matches_all(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch()
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_src_ip_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_src_ip_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(src_ip="192.168.1.0/24")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_src_ip_no_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_src_ip_no_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(src_ip="10.0.0.0/8")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is False
 
@@ -129,69 +123,47 @@ class TestFilterMatchMatchesRecord:
         match = FilterMatch(is_query=True)
         assert match.matches_record(RecordSection.Question, sample_record, query_packet) is True
 
-    def test_is_query_no_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_is_query_no_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(is_query=True)
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is False
 
-    def test_is_authoritative_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_is_authoritative_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(is_authoritative=True)
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_section_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_section_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(section=RecordSection.Answer)
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_section_no_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_section_no_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(section=RecordSection.Question)
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is False
 
-    def test_record_type_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_record_type_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(record_type="PTR")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_record_type_no_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_record_type_no_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(record_type="TXT")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is False
 
-    def test_service_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_service_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(service="_googlecast._tcp")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_service_glob_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_service_glob_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(service="_google*._tcp")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_instance_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_instance_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(instance="My-Device")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_instance_glob_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_instance_glob_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(instance="My-*")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
-    def test_name_match(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_name_match(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(name="*._googlecast._tcp.local")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is True
 
@@ -215,15 +187,11 @@ class TestFilterMatchMatchesRecord:
         match = FilterMatch(txt_contains="fn")
         assert match.matches_record(RecordSection.Answer, txt_record, sample_packet) is True
 
-    def test_txt_contains_non_txt_record(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_txt_contains_non_txt_record(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(txt_contains="anything")
         assert match.matches_record(RecordSection.Answer, sample_record, sample_packet) is False
 
-    def test_combined_criteria(
-        self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket
-    ) -> None:
+    def test_combined_criteria(self, sample_record: DNSRecord, sample_packet: ParsedMDNSPacket) -> None:
         match = FilterMatch(
             src_ip="192.168.1.0/24",
             service="_googlecast._tcp",

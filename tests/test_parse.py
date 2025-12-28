@@ -75,9 +75,7 @@ class TestParseServiceName:
     """Tests for MDNSParser.parse_service_name."""
 
     def test_full_service_name(self) -> None:
-        instance, service, domain = MDNSParser.parse_service_name(
-            "Google-Cast-Group-abc._googlecast._tcp.local"
-        )
+        instance, service, domain = MDNSParser.parse_service_name("Google-Cast-Group-abc._googlecast._tcp.local")
         assert instance == "Google-Cast-Group-abc"
         assert service == "_googlecast._tcp"
         assert domain == "local"
@@ -96,9 +94,7 @@ class TestParseServiceName:
 
     def test_instance_with_dots(self) -> None:
         # Instance name containing dots
-        instance, service, domain = MDNSParser.parse_service_name(
-            "My.Device.Name._http._tcp.local"
-        )
+        instance, service, domain = MDNSParser.parse_service_name("My.Device.Name._http._tcp.local")
         assert instance == "My.Device.Name"
         assert service == "_http._tcp"
         assert domain == "local"
@@ -122,9 +118,7 @@ class TestParseServiceName:
         assert domain == ""  # Empty string returns empty domain
 
     def test_subdomain_after_service(self) -> None:
-        instance, service, domain = MDNSParser.parse_service_name(
-            "Device._http._tcp.subdomain.local"
-        )
+        instance, service, domain = MDNSParser.parse_service_name("Device._http._tcp.subdomain.local")
         assert instance == "Device"
         assert service == "_http._tcp"
         assert domain == "subdomain.local"
@@ -186,9 +180,7 @@ class TestParse:
     def _build_question(self, name_bytes: bytes, qtype: int, qclass: int = 1) -> bytes:
         return name_bytes + struct.pack("!HH", qtype, qclass)
 
-    def _build_rr(
-        self, name_bytes: bytes, rtype: int, rclass: int, ttl: int, rdata: bytes
-    ) -> bytes:
+    def _build_rr(self, name_bytes: bytes, rtype: int, rclass: int, ttl: int, rdata: bytes) -> bytes:
         return name_bytes + struct.pack("!HHIH", rtype, rclass, ttl, len(rdata)) + rdata
 
     def test_too_short_returns_none(self) -> None:
