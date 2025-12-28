@@ -50,5 +50,6 @@ poetry install            # install dependencies
   - typing: `import typing as t ... foo: t.Annotated[list, "whatever"]`
   - pydantic: `import pydantic as p`
   - re: `import re as regex ... regex.search(...)`
+  - mdns_filter.const: `... as const`, although compound members (_e.g._ enums) may be imported into the local namespace
 - SCREAMING_CASE is not permitted; use PascalCase for all constants
 - Apart from aliased modules, variable names must be at least two characters long
