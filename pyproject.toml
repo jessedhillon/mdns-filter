@@ -42,6 +42,11 @@ venv = ".venv"
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 
+[tool.conventional-msg]
+types = ["chore", "docs", "feat", "fix", "refactor", "revise", "wip"]
+areas = ["all", "cli", "config", "const", "dev", "filter", "net", "parse", "util"]
+allow_omit_area = ["docs", "wip"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
