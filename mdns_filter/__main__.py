@@ -19,9 +19,6 @@ import fcntl
 import fnmatch
 import ipaddress
 import logging
-import logging.handlers
-import os
-import pwd
 import re as regex
 import signal
 import socket
@@ -42,7 +39,6 @@ import yaml
 Package = "mdns-filter"
 MdnsAddr = "224.0.0.251"
 MdnsPort = 5353
-DefaultPidfile = Path("/var/run/mdns-filter.pid")
 PacketSize = 65536
 
 
@@ -963,10 +959,7 @@ class RepeaterConfig(p.BaseModel):
         list[str],
         p.Field(min_length=2, description="Network interfaces to bridge"),
     ]
-    foreground: bool = False
     dry_run: bool = False
-    pid_file: Path = DefaultPidfile
-    user: str | None = None
     filter_config: FilterConfig = p.Field(default_factory=FilterConfig)
 
     # Legacy IP-based filtering (still supported)
@@ -979,14 +972,6 @@ class RepeaterConfig(p.BaseModel):
         if self.blacklist and self.whitelist:
             raise ValueError("Cannot specify both blacklist and whitelist")
         return self
-
-    @p.field_validator("pid_file")
-    @classmethod
-    def validate_pid_file(cls, val: Path) -> Path:
-        """Ensure PID file path is absolute."""
-        if not val.is_absolute():
-            raise ValueError("PID file path must be absolute")
-        return val
 
 
 # =============================================================================
@@ -1190,8 +1175,7 @@ class MDNSRepeater:
 
         # Handle denied packets
         if not should_forward:
-            if self.config.foreground or self.config.dry_run:
-                logger.info("DENY: %s (%s)", packet_summary, reason)
+            logger.info("DENY: %s (%s)", packet_summary, reason)
             return
 
         # Get target interfaces
@@ -1210,14 +1194,12 @@ class MDNSRepeater:
                 ", ".join(target_names),
                 reason,
             )
-            if packet and self.config.foreground:
-                # In foreground + dry_run, also show detailed packet info
+            if packet:
                 logger.debug("\n%s", packet.format_detailed())
             return
 
         # Actually forward the packet
-        if self.config.foreground:
-            logger.info("FORWARD: %s -> [%s] (%s)", packet_summary, ", ".join(target_names), reason)
+        logger.info("FORWARD: %s -> [%s] (%s)", packet_summary, ", ".join(target_names), reason)
 
         for iface in target_ifaces:
             try:
@@ -1250,92 +1232,13 @@ class MDNSRepeater:
         logger.info("Received signal %d, shutting down...", signum)
         self.shutdown_flag = True
 
-    def _check_already_running(self) -> int | None:
-        """Check if another instance is already running."""
-        if not self.config.pid_file.exists():
-            return None
-
-        try:
-            pid = int(self.config.pid_file.read_text().strip())
-            os.kill(pid, 0)
-            return pid
-        except (ValueError, ProcessLookupError, PermissionError):
-            return None
-
-    def _write_pidfile(self) -> bool:
-        """Write current PID to pidfile."""
-        try:
-            self.config.pid_file.write_text(str(os.getpid()))
-            return True
-        except OSError as err:
-            logger.error("Unable to write pid file %s: %s", self.config.pid_file, err)
-            return False
-
-    def _daemonize(self) -> None:
-        """Fork into background as a daemon."""
-        pid = os.fork()
-        if pid > 0:
-            sys.exit(0)
-
-        os.setsid()
-        os.umask(0o027)
-        os.chdir("/")
-
-        pid = os.fork()
-        if pid > 0:
-            sys.exit(0)
-
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        with open("/dev/null", "rb") as devnull:
-            os.dup2(devnull.fileno(), sys.stdin.fileno())
-        with open("/dev/null", "ab") as devnull:
-            os.dup2(devnull.fileno(), sys.stdout.fileno())
-            os.dup2(devnull.fileno(), sys.stderr.fileno())
-
-        running_pid = self._check_already_running()
-        if running_pid is not None:
-            logger.error("Already running as pid %d", running_pid)
-            sys.exit(1)
-
-        if not self._write_pidfile():
-            sys.exit(1)
-
-    def _switch_user(self) -> None:
-        """Switch to the specified user."""
-        if self.config.user is None:
-            return
-
-        try:
-            pw = pwd.getpwnam(self.config.user)
-        except KeyError:
-            logger.error("No such user '%s'", self.config.user)
-            sys.exit(2)
-
-        try:
-            os.setgid(pw.pw_gid)
-            os.setuid(pw.pw_uid)
-        except OSError as err:
-            logger.error("Failed to switch to user %s: %s", self.config.user, err)
-            sys.exit(2)
-
     def _setup_logging(self) -> None:
-        """Configure logging based on foreground/daemon mode."""
-        if self.config.foreground:
-            logging.basicConfig(
-                level=logging.DEBUG,
-                format=f"{Package}: %(message)s",
-                stream=sys.stderr,
-            )
-        else:
-            handler = logging.handlers.SysLogHandler(
-                address="/dev/log",
-                facility=logging.handlers.SysLogHandler.LOG_DAEMON,
-            )
-            handler.setFormatter(logging.Formatter(f"{Package}[%(process)d]: %(message)s"))
-            logger.addHandler(handler)
-            logger.setLevel(logging.INFO)
+        """Configure logging to stderr."""
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format=f"{Package}: %(message)s",
+            stream=sys.stderr,
+        )
 
     def _cleanup(self) -> None:
         """Clean up resources on shutdown."""
@@ -1344,12 +1247,6 @@ class MDNSRepeater:
 
         for iface in self.interface_sockets:
             iface.sockfd.close()
-
-        if self._check_already_running() == os.getpid():
-            try:
-                self.config.pid_file.unlink()
-            except OSError:
-                pass
 
         logger.info("Exit.")
 
@@ -1389,16 +1286,6 @@ class MDNSRepeater:
             logger.error("Failed to create sockets: %s", err)
             self._cleanup()
             return 1
-
-        self._switch_user()
-
-        if not self.config.foreground:
-            self._daemonize()
-        else:
-            running_pid = self._check_already_running()
-            if running_pid is not None:
-                logger.error("Already running as pid %d", running_pid)
-                return 1
 
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -1443,9 +1330,6 @@ Examples:
   # Basic usage - repeat between two interfaces
   mdns-filter eth0 wlan0
 
-  # Run in foreground for debugging
-  mdns-filter -f eth0 eth1
-
   # Dry run - see what would be forwarded without actually doing it
   mdns-filter --dry-run eth0 wlan0 \\
     --filter-allow 'instance:Google-Cast-*' \\
@@ -1469,30 +1353,10 @@ Examples:
 )
 @click.argument("interfaces", nargs=-1, required=True)
 @click.option(
-    "-f",
-    "--foreground",
-    is_flag=True,
-    help="Run in foreground for debugging.",
-)
-@click.option(
     "-n",
     "--dry-run",
     is_flag=True,
     help="Don't actually forward packets, just log what would happen.",
-)
-@click.option(
-    "-p",
-    "--pid-file",
-    type=ClickPath,
-    default=DefaultPidfile,
-    show_default=True,
-    help="PID file path (must be absolute).",
-)
-@click.option(
-    "-u",
-    "--user",
-    metavar="USERNAME",
-    help="Run as specified user (drop privileges).",
 )
 @click.option(
     "-b",
@@ -1538,10 +1402,7 @@ Examples:
 @click.version_option(version="2.0.0", prog_name=Package)
 def main(
     interfaces: tuple[str, ...],
-    foreground: bool,
     dry_run: bool,
-    pid_file: Path,
-    user: str | None,
     blacklist_cidrs: tuple[str, ...],
     whitelist_cidrs: tuple[str, ...],
     filter_config: Path | None,
@@ -1560,10 +1421,6 @@ def main(
     # Validate interface count
     if len(interfaces) < 2:
         raise click.UsageError("At least 2 interfaces must be specified.")
-
-    # Validate PID file path
-    if not pid_file.is_absolute():
-        raise click.UsageError("PID file path must be absolute.")
 
     # Parse legacy subnet filters
     try:
@@ -1607,17 +1464,10 @@ def main(
         )
 
     # Build config
-    # Note: dry_run implies foreground mode
-    if dry_run:
-        foreground = True
-
     try:
         config = RepeaterConfig(
             interfaces=list(interfaces),
-            foreground=foreground,
             dry_run=dry_run,
-            pid_file=pid_file,
-            user=user,
             blacklist=blacklist,
             whitelist=whitelist,
             filter_config=fc,

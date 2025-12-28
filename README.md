@@ -17,8 +17,6 @@ This is a Python rewrite and enhancement of [the original C implementation by Da
 - Pattern matching with glob, regex, and negation support
 - YAML configuration files for complex rule sets
 - CLI options for simple filtering scenarios
-- Daemonization with PID file management
-- Privilege dropping for security
 - Dry-run mode for testing configurations
 
 ## Requirements
@@ -51,20 +49,12 @@ Bridge mDNS traffic between two or more interfaces:
 mdns-filter eth0 wlan0
 ```
 
-### Foreground Mode
-
-Run in foreground for debugging (logs to stderr instead of syslog):
-
-```bash
-mdns-filter -f eth0 wlan0
-```
-
 ### Dry Run
 
 Test your configuration without actually forwarding packets:
 
 ```bash
-mdns-filter --dry-run -f eth0 wlan0 --filter-config filters.yaml
+mdns-filter --dry-run eth0 wlan0 --filter-config filters.yaml
 ```
 
 ### With Content Filtering
@@ -100,16 +90,13 @@ mdns-filter -w 192.168.5.0/24 eth0 wlan0
 ```
 Usage: mdns-filter [OPTIONS] INTERFACES...
 
-  mDNS filtering repeater daemon with content-based filtering.
+  mDNS repeater - repeats mDNS packets between network interfaces.
 
 Arguments:
   INTERFACES  Network interfaces to bridge (minimum 2 required)
 
 Options:
-  -f, --foreground          Run in foreground (don't daemonize)
   -n, --dry-run             Log decisions without forwarding packets
-  -p, --pid-file PATH       PID file path [default: /var/run/mdns-filter.pid]
-  -u, --user TEXT           Drop privileges to this user after binding sockets
   -b, --blacklist CIDR      Legacy IP blacklist (can be specified multiple times)
   -w, --whitelist CIDR      Legacy IP whitelist (can be specified multiple times)
   --filter-config PATH      Path to YAML filter configuration file
@@ -284,10 +271,10 @@ rules:
 
 ### Debug Mode
 
-Run with verbose logging to see all packet decisions:
+Run with dry-run mode to see all packet decisions without forwarding:
 
 ```bash
-mdns-filter -f --dry-run eth0 wlan0 --filter-config filters.yaml
+mdns-filter --dry-run eth0 wlan0 --filter-config filters.yaml
 ```
 
 This will log each packet received, the filter rule that matched (if any), and the resulting action without actually forwarding any packets.
@@ -310,15 +297,6 @@ This will log each packet received, the filter rule that matched (if any), and t
 
 5. **Forwarding**: If allowed, forwards the packet to all interfaces except the source interface.
 
-## Daemonization
-
-By default, `mdns-filter` daemonizes (forks to background) and:
-- Writes its PID to `/var/run/mdns-filter.pid` (configurable with `-p`)
-- Logs to syslog
-- Handles SIGTERM and SIGINT for graceful shutdown
-
-Use `-f` to run in foreground for debugging or when managed by a process supervisor.
-
 ## Systemd Service
 
 The recommended way to run mdns-filter in production is as a systemd service. This example uses `DynamicUser` to create a transient unprivileged user at runtime, and grants only the required `CAP_NET_RAW` capability.
@@ -333,7 +311,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/mdns-filter -f eth0 wlan0 --filter-config /etc/mdns-filter/filters.yaml
+ExecStart=/usr/local/bin/mdns-filter eth0 wlan0 --filter-config /etc/mdns-filter/filters.yaml
 
 # Security: run as a transient unprivileged user
 DynamicUser=yes
@@ -378,7 +356,7 @@ sudo cp filters.yaml /etc/mdns-filter/
 
 # If using Poetry/venv, create a wrapper script or adjust ExecStart path
 # For example, with a Poetry-managed install:
-# ExecStart=/opt/mdns-filter/.venv/bin/python -m mdns_filter -f eth0 wlan0
+# ExecStart=/opt/mdns-filter/.venv/bin/python -m mdns_filter eth0 wlan0
 
 # Enable and start the service
 sudo systemctl daemon-reload
@@ -390,11 +368,9 @@ sudo systemctl status mdns-filter
 sudo journalctl -u mdns-filter -f
 ```
 
-Note: When using `DynamicUser`, the `-u` flag is not needed since systemd handles user management. The `-f` (foreground) flag is required since systemd manages the process lifecycle.
-
 ## Security
 
-- **Privilege Dropping**: Use `-u username` to drop privileges after binding sockets. The daemon will switch to the specified user while retaining the ability to send/receive on already-bound sockets.
+- **Capability-Based Access**: When run via systemd with `DynamicUser` and `AmbientCapabilities=CAP_NET_RAW`, the process runs as an unprivileged user with only the minimum required capability for `SO_BINDTODEVICE`.
 
 - **Network Segmentation**: Content-based filtering enables fine-grained control over which services are visible across network segments, useful for isolating IoT devices or guest networks.
 
