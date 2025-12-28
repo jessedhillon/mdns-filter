@@ -367,3 +367,5 @@ See LICENSE file for details.
 ## Credits
 
 Based on the [original mdns-repeater by Darell Tan](https://github.com/geekman/mdns-repeater/), with content-based filtering extensions.
+
+Nearly all development accomplished with [Claude Code](https://www.claude.com/product/claude-code).
