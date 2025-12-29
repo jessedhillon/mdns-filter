@@ -1,10 +1,10 @@
 [package]
 name = "mdns-filter"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Jesse Dhillon <jesse@dhillon.com>"]
 description = "A filtering mDNS repeater"
-license = "GPL-2.0"
+license = "MIT"
 repository = "https://github.com/jessedhillon/mdns-filter"
 keywords = ["mdns", "multicast", "dns", "filter", "repeater"]
 categories = ["network-programming", "command-line-utilities"]
