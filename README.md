@@ -59,7 +59,10 @@ Add the flake to your NixOS configuration:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    mdns-filter.url = "github:jessedhillon/mdns-filter";
+    mdns-filter = {
+      url = "github:jessedhillon/mdns-filter";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = { nixpkgs, mdns-filter, ... }: {
