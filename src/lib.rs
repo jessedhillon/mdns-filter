@@ -16,3 +16,4 @@ pub use mdns::{
     DnsRecord, FilterAction, LogLevel, MdnsParser, ParsedMdnsPacket, RecordSection, RecordType,
     MDNS_PORT, MULTICAST_ADDRESS, PACKAGE, PACKET_SIZE,
 };
+pub use net::{create_multicast_socket, InterfaceInfo, InterfaceSocket};

@@ -1,3 +1,7 @@
 //! Network interface and socket handling.
 
-// TODO: Phase 5 - interface discovery and socket creation
+pub mod interface;
+pub mod socket;
+
+pub use interface::InterfaceInfo;
+pub use socket::{create_multicast_socket, InterfaceSocket};
