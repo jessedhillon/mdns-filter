@@ -39,12 +39,9 @@
             ];
           };
 
-          # Rust package build (for eventual nixpkgs)
           packages.default = craneLib.buildPackage {
             src = craneLib.cleanCargoSource ./.;
             strictDeps = true;
-            # buildInputs = [ ]; # add if needed
-            # nativeBuildInputs = [ ]; # add if needed
           };
 
           devShells.default = pkgs.devshell.mkShell {
@@ -62,24 +59,13 @@
             ];
 
             packages = with pkgs; [
-              # Python toolchain
-              (python312.withPackages (
-                pypkgs: with pypkgs; [
-                  isort
-                  pip
-                ]
-              ))
-              poetry
-              pyright
-              ruff
-
               # Rust toolchain
               rustToolchain
               cargo-watch
               cargo-edit
-              clang  # Linker for Rust builds
+              clang
 
-              # Shared tools
+              # Tools
               claude-code
               file
               gh
@@ -88,46 +74,8 @@
             ];
 
             commands = [
-              # Python commands
               {
-                name = "format-py";
-                command = ''
-                pushd $PRJ_ROOT
-                ruff format -q mdns_filter/ tests/ && isort -q --dt mdns_filter/ tests/
-                popd'';
-                help = "format Python code with ruff and isort";
-                category = "python";
-              }
-              {
-                name = "check-py";
-                command = ''
-                pushd $PRJ_ROOT
-                echo "mdns_filter"
-                (ruff check mdns_filter/ || true) | ts "[ruff]"
-                pyright mdns_filter/ | ts "[pyright]"
-
-                if [[ -d "tests/" ]]; then
-                  echo "tests"
-                  (ruff check tests/ || true) | ts "[ruff]"
-                  pyright tests/ | ts "[pyright]"
-                fi
-                popd'';
-                help = "lint and type-check Python code";
-                category = "python";
-              }
-              {
-                name = "test-py";
-                command = ''
-                pushd $PRJ_ROOT
-                pytest tests/ "$@"
-                popd'';
-                help = "run Python tests";
-                category = "python";
-              }
-
-              # Rust commands
-              {
-                name = "format-rs";
+                name = "format";
                 command = ''
                 pushd $PRJ_ROOT
                 cargo fmt
@@ -136,7 +84,7 @@
                 category = "rust";
               }
               {
-                name = "check-rs";
+                name = "check";
                 command = ''
                 pushd $PRJ_ROOT
                 echo "cargo check" | ts "[cargo]"
@@ -148,7 +96,7 @@
                 category = "rust";
               }
               {
-                name = "test-rs";
+                name = "test";
                 command = ''
                 pushd $PRJ_ROOT
                 cargo test "$@"
@@ -157,27 +105,13 @@
                 category = "rust";
               }
               {
-                name = "watch-rs";
+                name = "watch";
                 command = ''
                 pushd $PRJ_ROOT
                 cargo watch -x check -x "clippy -- -D warnings" -x test
                 popd'';
-                help = "watch and rebuild Rust on changes";
+                help = "watch and rebuild on changes";
                 category = "rust";
-              }
-
-              # Combined/default commands
-              {
-                name = "format";
-                command = "format-py; format-rs";
-                help = "format all code";
-                category = "all";
-              }
-              {
-                name = "check";
-                command = "check-py; check-rs";
-                help = "lint all code";
-                category = "all";
               }
             ];
           };
