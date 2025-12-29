@@ -1,6 +1,14 @@
 //! mdns-filter CLI entry point.
 
+use std::path::PathBuf;
+
+use anyhow::{Context, Result};
 use clap::Parser;
+use tracing_subscriber::EnvFilter;
+
+use mdns_filter::config::FilterConfig;
+use mdns_filter::mdns::FilterAction;
+use mdns_filter::repeater::{MdnsRepeater, RepeaterConfig};
 
 /// mDNS repeater - repeats mDNS packets between network interfaces.
 #[derive(Parser, Debug)]
@@ -10,6 +18,27 @@ use clap::Parser;
 #[command(
     long_about = "Repeats mDNS packets between network interfaces, enabling mDNS discovery across network segments."
 )]
+#[command(after_help = r#"EXAMPLES:
+  # Basic usage - repeat between two interfaces
+  mdns-filter eth0 wlan0
+
+  # Dry run - see what would be forwarded without actually doing it
+  mdns-filter --dry-run eth0 wlan0 \
+    --filter-allow 'instance:Google-Cast-*' \
+    --default-deny
+
+  # Allow only Google Cast groups, deny everything else
+  mdns-filter eth0 wlan0 \
+    --filter-allow 'instance:Google-Cast-*' \
+    --default-deny
+
+  # Deny specific devices
+  mdns-filter eth0 wlan0 \
+    --filter-deny 'instance:WiiM-*'
+
+  # Use a YAML config file for complex rules
+  mdns-filter eth0 wlan0 --filter-config /etc/mdns-filter/filters.yaml
+"#)]
 struct Args {
     /// Network interfaces to bridge (minimum 2 required).
     #[arg(required = true, num_args = 2..)]
@@ -21,7 +50,7 @@ struct Args {
 
     /// Path to YAML filter configuration file.
     #[arg(short = 'c', long = "filter-config")]
-    filter_config: Option<std::path::PathBuf>,
+    filter_config: Option<PathBuf>,
 
     /// Allow pattern (e.g., 'instance:Google-Cast-*,service:_googlecast._tcp').
     #[arg(long = "filter-allow")]
@@ -36,24 +65,64 @@ struct Args {
     default_deny: bool,
 }
 
-fn main() {
+fn setup_logging() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .without_time()
+        .init();
+}
+
+fn build_filter_config(args: &Args) -> Result<FilterConfig> {
+    if let Some(ref config_path) = args.filter_config {
+        // Load from file
+        if !args.filter_allow.is_empty() || !args.filter_deny.is_empty() {
+            anyhow::bail!("Cannot use --filter-config with --filter-allow or --filter-deny");
+        }
+        FilterConfig::from_yaml_file(config_path).with_context(|| {
+            format!(
+                "Failed to load filter config from {}",
+                config_path.display()
+            )
+        })
+    } else if !args.filter_allow.is_empty() || !args.filter_deny.is_empty() {
+        // Build from CLI patterns
+        FilterConfig::from_cli_patterns(&args.filter_allow, &args.filter_deny, args.default_deny)
+            .context("Failed to parse filter patterns")
+    } else {
+        // No content filtering
+        Ok(FilterConfig {
+            default_action: if args.default_deny {
+                FilterAction::Deny
+            } else {
+                FilterAction::Allow
+            },
+            rules: Vec::new(),
+        })
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Args::parse();
 
-    // TODO: Phase 6 - implement actual repeater logic
-    println!("mdns-filter starting...");
-    println!("Interfaces: {:?}", args.interfaces);
-    println!("Dry run: {}", args.dry_run);
-    println!("Default deny: {}", args.default_deny);
+    setup_logging();
 
-    if let Some(config_path) = &args.filter_config {
-        println!("Filter config: {}", config_path.display());
-    }
+    // Build filter configuration
+    let filter_config = build_filter_config(&args)?;
 
-    if !args.filter_allow.is_empty() {
-        println!("Allow patterns: {:?}", args.filter_allow);
-    }
+    // Build repeater configuration
+    let config = RepeaterConfig {
+        interfaces: args.interfaces,
+        dry_run: args.dry_run,
+        filter_config,
+    };
 
-    if !args.filter_deny.is_empty() {
-        println!("Deny patterns: {:?}", args.filter_deny);
-    }
+    // Run the repeater
+    let repeater = MdnsRepeater::new(config);
+    let exit_code = repeater.run().await?;
+
+    std::process::exit(exit_code);
 }

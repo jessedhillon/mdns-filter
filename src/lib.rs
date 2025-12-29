@@ -8,6 +8,7 @@ pub mod error;
 pub mod filter;
 pub mod mdns;
 pub mod net;
+pub mod repeater;
 
 pub use config::{FilterConfig, FilterMatch, FilterRule, MatchMode};
 pub use error::{Error, Result};
