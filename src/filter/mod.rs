@@ -1,4 +1,7 @@
 //! Filter engine and pattern matching.
 
-// TODO: Phase 2 - pattern matching
+pub mod pattern;
+
+pub use pattern::{CompiledPattern, PatternMatcher};
+
 // TODO: Phase 4 - filter engine
