@@ -21,6 +21,18 @@
     in
     inputs.fp.lib.mkFlake { inherit inputs; } {
       systems = inputs.nixpkgs.lib.systems.flakeExposed;
+
+      flake = {
+        # NixOS module for service configuration
+        nixosModules.mdns-filter = import ./nix/module.nix;
+        nixosModules.default = inputs.self.nixosModules.mdns-filter;
+
+        # Overlay to add mdns-filter package to pkgs
+        overlays.default = final: prev: {
+          mdns-filter = inputs.self.packages.${final.system}.default;
+        };
+      };
+
       perSystem =
         { system, pkgs, lib, ... }:
         let

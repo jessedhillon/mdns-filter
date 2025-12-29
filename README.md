@@ -50,6 +50,84 @@ nix develop
 cargo build --release
 ```
 
+### NixOS Module
+
+Add the flake to your NixOS configuration:
+
+```nix
+# flake.nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    mdns-filter.url = "github:jessedhillon/mdns-filter";
+  };
+
+  outputs = { nixpkgs, mdns-filter, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        # Apply overlay to make package available
+        { nixpkgs.overlays = [ mdns-filter.overlays.default ]; }
+        # Import the module
+        mdns-filter.nixosModules.default
+        ./configuration.nix
+      ];
+    };
+  };
+}
+```
+
+Then configure the service:
+
+```nix
+# configuration.nix
+{
+  services.mdns-filter = {
+    enable = true;
+    interfaces = [ "eth0" "wlan0" ];
+    defaultAction = "allow";
+    rules = {
+      deny-iot-subnet = {
+        match = { src_ip = "192.168.10.0/24"; };
+        action = "deny";
+      };
+      allow-chromecasts = {
+        match = {
+          instance = "Google-Cast-*";
+          service = "_googlecast._tcp";
+        };
+        matchMode = "all";
+        action = "allow";
+        log = "info";
+      };
+    };
+  };
+}
+```
+
+#### Module Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enable` | boolean | `false` | Enable the mdns-filter service |
+| `package` | package | `pkgs.mdns-filter` | The mdns-filter package to use |
+| `interfaces` | list of strings | *required* | Network interfaces to bridge (minimum 2) |
+| `defaultAction` | `"allow"` or `"deny"` | `"allow"` | Default action when no rules match |
+| `dryRun` | boolean | `false` | Log decisions without forwarding packets |
+| `rules` | attrset | `{}` | Filter rules (see below) |
+| `configFile` | path or null | `null` | Custom YAML config file (overrides `rules`/`defaultAction`) |
+
+#### Rule Options
+
+Each rule in `rules` supports:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `match` | attrset | *required* | Match criteria (see Match Criteria above) |
+| `action` | `"allow"` or `"deny"` | *required* | Action when rule matches |
+| `matchMode` | `"any"` or `"all"` | `null` (defaults to `"any"`) | How to match multiple criteria |
+| `log` | `"none"`, `"debug"`, or `"info"` | `null` | Log level when rule matches |
+
 ## Usage
 
 ### Basic Usage
