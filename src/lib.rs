@@ -1,0 +1,16 @@
+//! mdns-filter - A filtering mDNS repeater.
+//!
+//! This library provides functionality for parsing, filtering, and repeating
+//! mDNS (multicast DNS) packets between network interfaces.
+
+pub mod config;
+pub mod error;
+pub mod filter;
+pub mod mdns;
+pub mod net;
+
+pub use error::{Error, Result};
+pub use mdns::{
+    DnsRecord, FilterAction, LogLevel, ParsedMdnsPacket, RecordSection, RecordType, MDNS_PORT,
+    MULTICAST_ADDRESS, PACKAGE, PACKET_SIZE,
+};

@@ -77,6 +77,7 @@
               rustToolchain
               cargo-watch
               cargo-edit
+              clang  # Linker for Rust builds
 
               # Shared tools
               claude-code
