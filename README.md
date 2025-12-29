@@ -2,8 +2,6 @@
 
 A mDNS (multicast DNS) repeater daemon with advanced content-based filtering. Bridges mDNS traffic between network interfaces, enabling service discovery across network segments while providing fine-grained control over which services are advertised.
 
-This is a Python rewrite and enhancement of [the original C implementation by Darell Tan](https://github.com/geekman/mdns-repeater/), extended with sophisticated rule-based filtering that can match on mDNS packet contents rather than just IP addresses.
-
 ## Features
 
 - Repeat mDNS packets between multiple network interfaces
@@ -19,24 +17,37 @@ This is a Python rewrite and enhancement of [the original C implementation by Da
 - CLI options for simple filtering scenarios
 - Dry-run mode for testing configurations
 
+## History
+
+This project began as a port of [the original mdns-repeater by Darell Tan](https://github.com/geekman/mdns-repeater/), a minimal C program that bridges mDNS traffic between interfaces. The initial rewrite to Python added the content-based filtering system, enabling fine-grained control over which mDNS records are forwarded based on service types, instance names, TXT records, and other packet contents.
+
+The project was subsequently rewritten in Rust for two reasons:
+
+1. **Vibe-coding exploration**: This rewrite was an experiment in AI-assisted development, with nearly all code written through collaboration with [Claude Code](https://claude.ai/code). The structured nature of the port (well-defined inputs/outputs, comprehensive test coverage from the Python version) made it an ideal candidate for exploring this workflow.
+
+2. **Suitability for nixpkgs**: While the original C mdns-repeater is already packaged in nixpkgs, Python programs present packaging challenges: they require the Python interpreter plus all dependencies to be properly wired together, and Python package updates can cause cascading rebuilds. Rust produces a single static binary with no runtime dependencies, offering the same deployment simplicity as C while providing memory safety and modern language ergonomics. This makes it straightforward to package and maintain in nixpkgs.
+
 ## Requirements
 
-- Python 3.13+
-- Linux (uses `SO_BINDTODEVICE` and ioctl for interface management)
-- Root privileges or `CAP_NET_RAW` capability (required for `SO_BINDTODEVICE` to bind sockets to specific interfaces)
+- Linux (uses raw sockets for multicast group management)
+- Root privileges or `CAP_NET_RAW` capability
 
 ## Installation
-
-### Using Poetry
-
-```bash
-poetry install
-```
 
 ### Using Nix
 
 ```bash
+# Build
+nix build
+
+# Development shell
 nix develop
+```
+
+### Using Cargo
+
+```bash
+cargo build --release
 ```
 
 ## Usage
@@ -76,20 +87,19 @@ mdns-filter eth0 wlan0 --filter-config /etc/mdns-filter/filters.yaml
 ## CLI Reference
 
 ```
-Usage: mdns-filter [OPTIONS] INTERFACES...
-
-  mDNS repeater - repeats mDNS packets between network interfaces.
+Usage: mdns-filter [OPTIONS] <INTERFACES>...
 
 Arguments:
-  INTERFACES  Network interfaces to bridge (minimum 2 required)
+  <INTERFACES>...  Network interfaces to bridge (minimum 2 required)
 
 Options:
-  -n, --dry-run             Log decisions without forwarding packets
-  --filter-config PATH      Path to YAML filter configuration file
-  --filter-allow PATTERN    Allow pattern (can be specified multiple times)
-  --filter-deny PATTERN     Deny pattern (can be specified multiple times)
-  --default-deny            Deny packets by default (instead of allow)
-  --help                    Show this message and exit
+  -n, --dry-run                  Don't actually forward packets, just log what would happen
+  -c, --filter-config <PATH>     Path to YAML filter configuration file
+      --filter-allow <PATTERN>   Allow pattern (e.g., 'instance:Google-Cast-*')
+      --filter-deny <PATTERN>    Deny pattern (e.g., 'instance:WiiM-*')
+      --default-deny             Deny packets that don't match any filter rule
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
 ## Configuration
@@ -154,7 +164,6 @@ The `match` object supports the following fields:
 |-------|------|-------------|
 | `src_ip` | string | Source IP address in CIDR notation (e.g., `192.168.1.0/24`) |
 | `is_query` | boolean | Match query packets (`true`) or response packets (`false`) |
-| `is_authoritative` | boolean | Match authoritative responses |
 | `service` | string/list | Service type (e.g., `_googlecast._tcp`, `_airplay._tcp`) |
 | `instance` | string/list | Service instance name (e.g., `Living Room TV`) |
 | `name` | string/list | Full DNS name |
@@ -285,8 +294,6 @@ This will log each packet received, the filter rule that matched (if any), and t
 
 ## Systemd Service
 
-The recommended way to run mdns-filter in production is as a systemd service. This example uses `DynamicUser` to create a transient unprivileged user at runtime, and grants only the required `CAP_NET_RAW` capability.
-
 Create `/etc/systemd/system/mdns-filter.service`:
 
 ```ini
@@ -302,7 +309,7 @@ ExecStart=/usr/local/bin/mdns-filter eth0 wlan0 --filter-config /etc/mdns-filter
 # Security: run as a transient unprivileged user
 DynamicUser=yes
 
-# Grant only the capability needed for SO_BINDTODEVICE
+# Grant only the capability needed for raw socket operations
 AmbientCapabilities=CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_RAW
 
@@ -340,10 +347,6 @@ Install and start:
 sudo mkdir -p /etc/mdns-filter
 sudo cp filters.yaml /etc/mdns-filter/
 
-# If using Poetry/venv, create a wrapper script or adjust ExecStart path
-# For example, with a Poetry-managed install:
-# ExecStart=/opt/mdns-filter/.venv/bin/python -m mdns_filter eth0 wlan0
-
 # Enable and start the service
 sudo systemctl daemon-reload
 sudo systemctl enable mdns-filter
@@ -356,7 +359,7 @@ sudo journalctl -u mdns-filter -f
 
 ## Security
 
-- **Capability-Based Access**: When run via systemd with `DynamicUser` and `AmbientCapabilities=CAP_NET_RAW`, the process runs as an unprivileged user with only the minimum required capability for `SO_BINDTODEVICE`.
+- **Capability-Based Access**: When run via systemd with `DynamicUser` and `AmbientCapabilities=CAP_NET_RAW`, the process runs as an unprivileged user with only the minimum required capability for multicast socket operations.
 
 - **Network Segmentation**: Content-based filtering enables fine-grained control over which services are visible across network segments, useful for isolating IoT devices or guest networks.
 
@@ -368,4 +371,4 @@ See LICENSE file for details.
 
 Based on the [original mdns-repeater by Darell Tan](https://github.com/geekman/mdns-repeater/), with content-based filtering extensions.
 
-Nearly all development accomplished with [Claude Code](https://www.claude.com/product/claude-code).
+Development accomplished with [Claude Code](https://claude.ai/code).
