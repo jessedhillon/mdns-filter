@@ -44,7 +44,7 @@ typeCheckingMode = "strict"
 
 [tool.conventional-msg]
 types = ["chore", "docs", "feat", "fix", "refactor", "revise", "wip"]
-areas = ["all", "cli", "config", "const", "dev", "filter", "net", "parse", "tests", "util"]
+areas = ["all", "cli", "config", "const", "dev", "filter", "mdns", "net", "parse", "rust", "tests", "util"]
 allow_omit_area = ["docs", "wip"]
 
 [build-system]
