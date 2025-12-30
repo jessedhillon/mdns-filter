@@ -10,7 +10,7 @@ repos:
   # Pre-commit: fast checks
   - id: cargo-lock-check
     name: cargo check
-    entry: cargo check --locked
+    entry: nix develop --command cargo check --locked
     language: system
     files: ^(Cargo\.toml|Cargo\.lock)$
     pass_filenames: false
