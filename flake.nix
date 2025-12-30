@@ -29,7 +29,7 @@
 
         # Overlay to add mdns-filter package to pkgs
         overlays.default = final: prev: {
-          mdns-filter = inputs.self.packages.${final.system}.default;
+          mdns-filter = inputs.self.packages.${final.stdenv.hostPlatform.system}.default;
         };
       };
 
@@ -54,6 +54,7 @@
           packages.default = craneLib.buildPackage {
             src = craneLib.cleanCargoSource ./.;
             strictDeps = true;
+            meta.mainProgram = "mdns-filter";
           };
 
           devShells.default = pkgs.devshell.mkShell {
