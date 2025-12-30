@@ -1,6 +1,6 @@
 [package]
 name = "mdns-filter"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["Jesse Dhillon <jesse@dhillon.com>"]
 description = "A filtering mDNS repeater"

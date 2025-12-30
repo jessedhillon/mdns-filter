@@ -208,7 +208,7 @@ impl MdnsRepeater {
         }
 
         // Actually forward
-        info!(
+        debug!(
             "FORWARD: {} -> [{}] ({})",
             packet_summary,
             target_names.join(", "),

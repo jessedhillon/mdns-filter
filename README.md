@@ -355,6 +355,28 @@ mdns-filter --dry-run eth0 wlan0 --filter-config filters.yaml
 
 This will log each packet received, the filter rule that matched (if any), and the resulting action without actually forwarding any packets.
 
+### Logging
+
+By default, only denied packets and errors are logged. Forwarded packets are logged at debug level to keep production logs quiet.
+
+To see all forwarded packets:
+
+```bash
+RUST_LOG=debug mdns-filter eth0 wlan0
+```
+
+To see only warnings and errors:
+
+```bash
+RUST_LOG=warn mdns-filter eth0 wlan0
+```
+
+For systemd services, set the environment variable in the unit file:
+
+```ini
+Environment=RUST_LOG=debug
+```
+
 ## How It Works
 
 1. **Socket Setup**: Creates a UDP socket bound to the mDNS multicast address (224.0.0.251:5353) and joins the multicast group on all specified interfaces.
