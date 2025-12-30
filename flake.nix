@@ -57,6 +57,21 @@
             meta.mainProgram = "mdns-filter";
           };
 
+          checks = {
+            # Verify the package builds
+            package = inputs.self.packages.${system}.default;
+          } // lib.optionalAttrs pkgs.stdenv.isLinux {
+            # Test NixOS module configuration (Linux only)
+            nixos-module = (inputs.nixpkgs.lib.nixosSystem {
+              inherit system;
+              modules = [
+                { nixpkgs.overlays = [ inputs.self.overlays.default ]; }
+                inputs.self.nixosModules.default
+                ./nix/test-config.nix
+              ];
+            }).config.system.build.toplevel;
+          };
+
           devShells.default = pkgs.devshell.mkShell {
             name = "${project-name}";
             motd = "{32}${project-name} {reset}\n$(type -p menu &>/dev/null && menu)\n";

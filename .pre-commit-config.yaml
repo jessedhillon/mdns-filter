@@ -4,3 +4,35 @@ repos:
   hooks:
   - id: conventional-msg
     stages: [commit-msg]
+
+- repo: local
+  hooks:
+  # Pre-commit: fast checks
+  - id: cargo-lock-check
+    name: cargo check
+    entry: cargo check --locked
+    language: system
+    files: ^(Cargo\.toml|Cargo\.lock)$
+    pass_filenames: false
+
+  - id: nix-module-eval
+    name: nix eval
+    entry: "nix eval .#nixosModules.default --apply 'x: \"ok\"'"
+    language: system
+    files: ^(flake\.nix|nix/.*)$
+    pass_filenames: false
+
+  # Pre-push: thorough checks
+  - id: nix-build
+    name: nix build
+    entry: nix build
+    language: system
+    stages: [pre-push]
+    pass_filenames: false
+
+  - id: nix-flake-check
+    name: nix flake check
+    entry: nix flake check
+    language: system
+    stages: [pre-push]
+    pass_filenames: false
